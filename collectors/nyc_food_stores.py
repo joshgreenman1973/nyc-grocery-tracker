@@ -50,33 +50,26 @@ import re
 # what readers mean by "supermarket". Excluding by name is imperfect but
 # beats trusting square footage alone, which would count Walgreens,
 # Dollar Tree, Restaurant Depot, breweries, and 7-Elevens as supermarkets.
-NON_SUPERMARKET_PATTERNS = [
+# Patterns that disqualify a store from the supermarket category but keep
+# it visible (it still sells food — pharmacies, dollar stores, restaurants,
+# convenience stores, bakeries, delis).
+DEMOTE_PATTERNS = [
     # Pharmacies / drug stores
     r"\bWALGREEN", r"\bRITE\s*AID\b", r"\bCVS\b", r"\bDUANE\s*READE\b",
     r"\bPHARMAC", r"\bDRUG\s*STORE\b", r"\bDRUGS\b",
     # Dollar / variety / discount
     r"DOLLAR\s*TREE", r"DOLLAR\s*GENERAL", r"FAMILY\s*DOLLAR",
     r"99\s*CENT", r"99CENT", r"\bDOLLAR\s*PLUS\b",
-    # Convenience / gas
+    # Convenience
     r"7-?\s*ELEVEN", r"\bWAWA\b", r"\bAMPM\b", r"\bQUIK\b", r"\bCIRCLE\s*K\b",
-    r"\bEXXON\b", r"\bSHELL\b", r"\bMOBIL\b", r"\bCITGO\b", r"\bGULF\b",
-    r"\bSUNOCO\b", r"\bBP\s+GAS\b", r"\bSPEEDWAY\b",
-    # Alcohol-only retailers and producers
-    r"\bBREW(ING|ERY|HOUSE|PUB)\b", r"\bBREWERS\b", r"\bDISTILL",
-    r"\bWINERY\b", r"\bCIDER(Y)?\b", r"\bMEADERY\b",
-    r"\bLIQUOR\b", r"\bSPIRITS\b", r"WINE\s*&\s*SPIRITS",
-    r"WINES\s*&\s*LIQUORS?", r"\bTAPROOM\b", r"\bTAP\s*ROOM\b",
-    # Bars / restaurants / cafes / fast-food
-    r"\bTAVERN\b", r"\bPUB\b", r"\bCOCKTAIL", r"\bBAR\s*&\s*GRILL\b",
+    # Restaurants / cafes / fast-food
     r"\bRESTAURANT\b", r"\bBISTRO\b", r"\bEATERY\b", r"\bDINER\b",
     r"\bGRILL\b", r"\bBBQ\b", r"\bKITCHEN\b", r"\bSTEAKHOUSE\b",
     r"\bPIZZ", r"\bSUSHI\b", r"\bRAMEN\b", r"\bNOODLE\b",
     r"\bTACO\b", r"\bBURGER\b", r"\bKEBAB\b", r"\bDONUT\b", r"DUNKIN",
     r"STARBUCKS", r"\bCOFFEE\b", r"\bCAFE\b", r"\bCAF\b",
-    # Bakeries (not full-service grocery in this dataset)
+    # Bakeries
     r"\bBAKERY\b", r"\bBAKERIE\b", r"\bBAKE\s*SHOP\b", r"\bPATISSERIE\b",
-    # Tobacco / vape
-    r"\bTOBACCO\b", r"\bCIGAR\b", r"\bVAPE\b", r"\bSMOKE\s*SHOP\b",
     # Religious / institutional
     r"^CHURCH\b", r"\bMOSQUE\b", r"\bSYNAGOGUE\b", r"\bTEMPLE\b",
     r"\bUNIVERSITY\b", r"\bCOLLEGE\b", r"\bACADEMY\b",
@@ -85,23 +78,53 @@ NON_SUPERMARKET_PATTERNS = [
     # Wholesale / non-retail
     r"RESTAURANT\s*DEPOT", r"\bCOMMISSARY\b", r"\bWAREHOUSE\b",
     r"\bWHOLESALE\b", r"\bDISTRIBUT", r"\bIMPORT\b",
-    # Other obvious non-grocery
+    # Sweets / specialty
     r"\bICE\s*CREAM\b", r"\bGELATO\b", r"\bFROZEN\s*YOGURT\b",
     r"\bCHOCOLATE\b", r"\bCANDY\b", r"\bSWEETS\b",
     r"\bJUICE\s*BAR\b", r"\bSMOOTHIE\b",
     r"\bFLORIST\b", r"\bFLOWER\b",
 ]
-NON_SUPERMARKET_RE = re.compile("|".join(NON_SUPERMARKET_PATTERNS), re.IGNORECASE)
+
+# Patterns that drop a store from the dataset entirely. These are not
+# food retailers in any meaningful sense — alcohol producers, bars, liquor
+# stores, gas stations, tobacco/vape shops. They get state food licenses
+# only because they sell some packaged snacks; including them would clutter
+# the map without informing anything about food access.
+DROP_PATTERNS = [
+    # Alcohol producers
+    r"\bBREW(ING|ERY|HOUSE|PUB)\b", r"\bBREWERS\b", r"\bDISTILL",
+    r"\bWINERY\b", r"\bCIDER(Y)?\b", r"\bMEADERY\b",
+    r"\bTAPROOM\b", r"\bTAP\s*ROOM\b",
+    # Bars
+    r"\bTAVERN\b", r"\bPUB\b", r"\bCOCKTAIL", r"\bBAR\s*&\s*GRILL\b",
+    # Liquor / wine stores
+    r"\bLIQUOR\b", r"\bSPIRITS\b", r"WINE\s*&\s*SPIRITS",
+    r"WINES\s*&\s*LIQUORS?",
+    # Gas stations (food sales are incidental)
+    r"\bEXXON\b", r"\bSHELL\b", r"\bMOBIL\b", r"\bCITGO\b", r"\bGULF\b",
+    r"\bSUNOCO\b", r"\bBP\s+GAS\b", r"\bSPEEDWAY\b",
+    # Tobacco / vape
+    r"\bTOBACCO\b", r"\bCIGAR\b", r"\bVAPE\b", r"\bSMOKE\s*SHOP\b",
+]
+
+DEMOTE_RE = re.compile("|".join(DEMOTE_PATTERNS), re.IGNORECASE)
+DROP_RE = re.compile("|".join(DROP_PATTERNS), re.IGNORECASE)
+
+
+def classify_name(name: str):
+    """Returns one of "supermarket", "demote", or "drop"."""
+    if not name:
+        return "demote"
+    if DROP_RE.search(name):
+        return "drop"
+    if DEMOTE_RE.search(name):
+        return "demote"
+    return "supermarket"
 
 
 def is_likely_supermarket(name: str, sqft):
-    """Best-effort classification: is this a name that a reader would consider
-    a grocery store / supermarket? False if name matches the denylist."""
-    if not name:
-        return False
-    if NON_SUPERMARKET_RE.search(name):
-        return False
-    return True
+    """Backwards-compatible wrapper: True iff classify_name == 'supermarket'."""
+    return classify_name(name) == "supermarket"
 
 
 def classify(sqft, is_supermarket: bool):
@@ -149,6 +172,7 @@ def main() -> int:
     features = []
     flat_rows = []
     skipped_no_geo = 0
+    dropped_by_name = 0
     for r in rows:
         geo = r.get("georeference")
         if not geo or geo.get("type") != "Point":
@@ -162,14 +186,18 @@ def main() -> int:
                 sqft = int(float(sqft_raw))
             except (ValueError, TypeError):
                 sqft = None
-        # Run name filter against BOTH dba_name and entity_name -- some
-        # operators file an innocuous DBA but the legal entity name reveals
-        # the category (e.g., "FINBACK BROOKLYN" / "FINBACK BREWERY LLC").
+        # Run name filter against BOTH dba_name and entity_name.
         name_for_filter = " ".join([
             (r.get("dba_name") or "").upper(),
             (r.get("entity_name") or "").upper(),
         ]).strip()
-        is_supermarket = is_likely_supermarket(name_for_filter, sqft)
+        cls = classify_name(name_for_filter)
+        if cls == "drop":
+            # Brewery, bar, liquor store, gas station, tobacco shop --
+            # not a food retailer in any useful sense; exclude entirely.
+            dropped_by_name += 1
+            continue
+        is_supermarket = (cls == "supermarket")
         size_class = classify(sqft, is_supermarket)
         county = (r.get("county") or "").upper()
         borough = COUNTY_TO_BOROUGH.get(county, "")
@@ -225,6 +253,7 @@ def main() -> int:
     print(f"Wrote {len(features)} stores to {geo_path}", file=sys.stderr)
     print(f"Wrote {csv_path}", file=sys.stderr)
     print(f"Skipped {skipped_no_geo} stores without georeference", file=sys.stderr)
+    print(f"Dropped {dropped_by_name} stores by name (brewery/bar/liquor/gas/tobacco)", file=sys.stderr)
     return 0
 
 

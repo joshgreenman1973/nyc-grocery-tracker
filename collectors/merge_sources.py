@@ -157,6 +157,20 @@ def main() -> int:
                         "shop=chemist", "shop=cosmetics", "shop=gas",
                     )
                 )
+                # OSM categories that should DROP the store entirely
+                # (alcohol production, bars, liquor stores, gas, tobacco).
+                drop_categories = {
+                    "craft=brewery", "craft=distillery",
+                    "craft=winery", "craft=cidery",
+                    "amenity=bar", "amenity=pub", "amenity=nightclub",
+                    "amenity=biergarten",
+                    "amenity=fuel", "amenity=tobacco_shop",
+                    "shop=alcohol", "shop=wine", "shop=tobacco",
+                    "shop=gas",
+                }
+                if best_cat in drop_categories:
+                    f["properties"]["_drop"] = True
+                    continue
                 if hard_disqualify:
                     # Safeguards against over-correction:
                     # 1. Don't demote stores whose name is explicitly a
@@ -186,7 +200,14 @@ def main() -> int:
                     f["properties"]["size_class"] = "Other licensed food retailer"
                     f["properties"]["osm_override"] = best_cat
                     cat_override_count += 1
+        # Filter out features marked _drop = True
+        before_drop = len(state_features)
+        state_features = [f for f in state_features if not f["properties"].get("_drop")]
+        dropped_by_osm = before_drop - len(state_features)
+        for f in state_features:
+            f["properties"].pop("_drop", None)
         print(f"  OSM category overrides applied: {cat_override_count}", file=sys.stderr)
+        print(f"  OSM-tag drops (brewery/bar/liquor/gas/tobacco): {dropped_by_osm}", file=sys.stderr)
     else:
         print(f"  (no OSM categories file at {CATEGORIES_PATH}; skipping override step)", file=sys.stderr)
 

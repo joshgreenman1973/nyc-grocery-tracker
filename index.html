@@ -247,7 +247,7 @@
     </label>
 
     <div id="points-controls">
-      <h2>Chain type (full supermarkets)</h2>
+      <h2>Chain type</h2>
       <label class="toggle">
         <input type="checkbox" data-chain="national" checked>
         <span class="swatch" style="background: #1f3a93; border: 2px solid #c23616;"></span>
@@ -415,7 +415,7 @@ const layers = {};
 const counts = {};
 let allFeatures = [];
 
-fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507d')
+fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507e')
   .then(r => r.json())
   .then(geo => {
     allFeatures = geo.features;
@@ -436,12 +436,11 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507d')
       el.textContent = (counts[cls] || 0).toLocaleString();
     });
 
-    // Chain counts (limited to "full supermarket" candidates)
+    // Chain counts across all stores
     const chainCounts = { national: 0, local_nyc: 0, independent: 0 };
     for (const f of allFeatures) {
-      const p = f.properties;
-      const isFull = p.is_supermarket && ((p.sqft && p.sqft >= 5000) || p.source === 'osm');
-      if (isFull) chainCounts[p.chain_type || 'independent'] = (chainCounts[p.chain_type || 'independent'] || 0) + 1;
+      const t = f.properties.chain_type || 'independent';
+      chainCounts[t] = (chainCounts[t] || 0) + 1;
     }
     document.querySelectorAll('[data-chain-count]').forEach(el => {
       const k = el.getAttribute('data-chain-count');
@@ -510,13 +509,9 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507d')
       const active = activeChains();
       Object.values(layers).forEach(layer => {
         layer.eachLayer(m => {
-          // Only the "full supermarket" markers are subject to chain filter;
-          // small grocers / corner stores stay visible regardless.
-          if (m._isFull) {
-            const visible = active.has(m._chainType);
-            m.setStyle({ opacity: visible ? 0.95 : 0, fillOpacity: visible ? 0.78 : 0 });
-            if (m._path) m._path.style.pointerEvents = visible ? 'auto' : 'none';
-          }
+          const visible = active.has(m._chainType);
+          m.setStyle({ opacity: visible ? 0.95 : 0, fillOpacity: visible ? 0.78 : 0 });
+          if (m._path) m._path.style.pointerEvents = visible ? 'auto' : 'none';
         });
       });
     }
@@ -577,7 +572,7 @@ function choroColor(per10k, pop) {
 
 function loadDensityLayer() {
   if (densityLayer) return Promise.resolve(densityLayer);
-  return fetch('data/processed/nyc_zip_density.geojson?v=20260507d')
+  return fetch('data/processed/nyc_zip_density.geojson?v=20260507e')
     .then(r => r.json())
     .then(geo => {
       densityLayer = L.geoJSON(geo, {
