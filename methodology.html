@@ -80,6 +80,15 @@
 </ul>
 <p>Throughout the map, &quot;full supermarket&quot; means a store that passes the name filter and is at least 5,000 square feet.</p>
 
+<h2>Chain classification</h2>
+<p>Each store with a recognizable chain name is tagged as one of three buckets, used both as a filter and as a force-include rescue (a chain match overrides earlier denylist or OSM-tag false negatives &mdash; e.g., a Whole Foods entrance sometimes tagged as <code>amenity=cafe</code> in OSM):</p>
+<ul>
+  <li><strong>National</strong> &mdash; chains operating across multiple US regions: Whole Foods Market, Trader Joe's, Costco, Sam's Club, BJ's, Walmart, Target, Aldi, Lidl, Wegmans, ShopRite, Stop &amp; Shop, Acme, Sprouts, Fresh Market, Amazon Fresh.</li>
+  <li><strong>Local NYC</strong> &mdash; NYC-area chains: Key Food, Associated, Met Food, C-Town, Bravo, Pioneer, Foodtown, Fine Fare, Compare Foods, Gristedes, Morton Williams, Western Beef, Food Bazaar, H Mart, Iavarone, Uncle Giuseppe's, Citarella, Eli's, Westside Market, Zabar's, Gourmet Garage, Food Emporium, Food Universe, Food Dynasty, Red Apple, NetCost, Gourmet Glatt, Super Fresh, Cherry Valley, Fairway, Patel Brothers, Trade Fair, Ideal Food Basket, Food Cellar, Park Slope Food Coop, and others. Full pattern list in <code>collectors/chains.py</code>.</li>
+  <li><strong>Independent</strong> &mdash; everything else.</li>
+</ul>
+<p>The chain rule also softens the OSM-tag override in two cases: (1) any store whose name explicitly contains &quot;SUPERMARKET&quot;, &quot;SUPERMRKT&quot;, or &quot;SUPER MARKET&quot; is never demoted, and (2) restaurant / cafe / fast-food / bakery overrides are not applied to stores 12,000 square feet or larger, since a deli counter inside a real supermarket is often tagged as a separate <code>amenity=restaurant</code> point in OSM.</p>
+
 <h2>ZIP-level density layer</h2>
 <p>The density view renders a choropleth across NYC's 178 Modified ZIP Code Tabulation Areas (MODZCTAs) published by the NYC Department of Health and Mental Hygiene. Each polygon is colored by full supermarkets per 10,000 residents, using the population estimates that come with the MODZCTA file. Stores are matched to a MODZCTA via the operator-filed ZIP. About 50 stores have a ZIP that does not map to any MODZCTA and are dropped from the density view; they remain in the points view.</p>
 
