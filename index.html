@@ -247,6 +247,26 @@
     </label>
 
     <div id="points-controls">
+      <h2>Chain type (full supermarkets)</h2>
+      <label class="toggle">
+        <input type="checkbox" data-chain="national" checked>
+        <span class="swatch" style="background: #1f3a93; border: 2px solid #c23616;"></span>
+        <span class="label-text">National (Whole Foods, Lidl, Aldi&hellip;)</span>
+        <span class="count" data-chain-count="national"></span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" data-chain="local_nyc" checked>
+        <span class="swatch" style="background: #1f3a93; border: 2px solid #2d8659;"></span>
+        <span class="label-text">Local NYC (Key Food, C-Town&hellip;)</span>
+        <span class="count" data-chain-count="local_nyc"></span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" data-chain="independent" checked>
+        <span class="swatch" style="background: #1f3a93;"></span>
+        <span class="label-text">Independent</span>
+        <span class="count" data-chain-count="independent"></span>
+      </label>
+
       <h2>Store size (likely supermarket)</h2>
       <label class="toggle">
         <input type="checkbox" data-class="Large supermarket" checked>
@@ -395,7 +415,7 @@ const layers = {};
 const counts = {};
 let allFeatures = [];
 
-fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507c')
+fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507d')
   .then(r => r.json())
   .then(geo => {
     allFeatures = geo.features;
@@ -416,6 +436,18 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507c')
       el.textContent = (counts[cls] || 0).toLocaleString();
     });
 
+    // Chain counts (limited to "full supermarket" candidates)
+    const chainCounts = { national: 0, local_nyc: 0, independent: 0 };
+    for (const f of allFeatures) {
+      const p = f.properties;
+      const isFull = p.is_supermarket && ((p.sqft && p.sqft >= 5000) || p.source === 'osm');
+      if (isFull) chainCounts[p.chain_type || 'independent'] = (chainCounts[p.chain_type || 'independent'] || 0) + 1;
+    }
+    document.querySelectorAll('[data-chain-count]').forEach(el => {
+      const k = el.getAttribute('data-chain-count');
+      el.textContent = (chainCounts[k] || 0).toLocaleString();
+    });
+
     // Build a layer per class
     for (const cls of Object.keys(SIZE_COLORS)) {
       const feats = grouped[cls] || [];
@@ -423,14 +455,24 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507c')
       for (const f of feats) {
         const [lon, lat] = f.geometry.coordinates;
         const p = f.properties;
+        // Chain accent: ring color reflects chain type for full supermarkets
+        const isFull = p.is_supermarket && ((p.sqft && p.sqft >= 5000) || p.source === 'osm');
+        let strokeColor = '#222';
+        let strokeWeight = 0.4;
+        if (isFull) {
+          if (p.chain_type === 'national') { strokeColor = '#c23616'; strokeWeight = 1.6; }
+          else if (p.chain_type === 'local_nyc') { strokeColor = '#2d8659'; strokeWeight = 1.6; }
+        }
         const marker = L.circleMarker([lat, lon], {
           radius: SIZE_RADII[cls],
           fillColor: SIZE_COLORS[cls],
-          color: '#222',
-          weight: 0.4,
-          opacity: 0.9,
+          color: strokeColor,
+          weight: strokeWeight,
+          opacity: 0.95,
           fillOpacity: 0.78,
         });
+        marker._chainType = p.chain_type || 'independent';
+        marker._isFull = isFull;
         const sqftStr = p.sqft ? p.sqft.toLocaleString() + ' sqft' : 'size not reported';
         const sourceStr = p.source === 'both' ? 'NY State + OSM'
           : p.source === 'osm' ? 'OpenStreetMap (likely new opening)'
@@ -445,6 +487,9 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507c')
           `<div class="name">${escapeHtml(p.name || 'Unnamed store')}</div>` +
           `<div class="meta">${escapeHtml(p.address)}${p.zip ? ', ' + escapeHtml(p.zip) : ''}</div>` +
           `<div class="meta">${sqftStr} &middot; ${escapeHtml(p.size_class)}</div>` +
+          (p.chain_name
+            ? `<div class="meta"><strong>${escapeHtml(p.chain_name)}</strong> &middot; ${p.chain_type === 'national' ? 'National chain' : p.chain_type === 'local_nyc' ? 'Local NYC chain' : 'Independent'}</div>`
+            : '') +
           overrideStr +
           `<div class="meta" style="margin-top:4px;">${licenseStr}</div>`
         );
@@ -453,6 +498,32 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507c')
       layers[cls] = layer;
     }
 
+    // Chain filter state
+    function activeChains() {
+      const set = new Set();
+      document.querySelectorAll('input[data-chain]').forEach(input => {
+        if (input.checked) set.add(input.getAttribute('data-chain'));
+      });
+      return set;
+    }
+    function applyChainFilter() {
+      const active = activeChains();
+      Object.values(layers).forEach(layer => {
+        layer.eachLayer(m => {
+          // Only the "full supermarket" markers are subject to chain filter;
+          // small grocers / corner stores stay visible regardless.
+          if (m._isFull) {
+            const visible = active.has(m._chainType);
+            m.setStyle({ opacity: visible ? 0.95 : 0, fillOpacity: visible ? 0.78 : 0 });
+            if (m._path) m._path.style.pointerEvents = visible ? 'auto' : 'none';
+          }
+        });
+      });
+    }
+    document.querySelectorAll('input[data-chain]').forEach(input => {
+      input.addEventListener('change', applyChainFilter);
+    });
+
     // Initial display: supermarket classes only (per default checkboxes)
     document.querySelectorAll('input[data-class]').forEach(input => {
       const cls = input.getAttribute('data-class');
@@ -460,6 +531,7 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507c')
       input.addEventListener('change', () => {
         if (input.checked) layers[cls].addTo(map);
         else map.removeLayer(layers[cls]);
+        applyChainFilter();  // re-apply when re-adding
       });
     });
 
@@ -505,7 +577,7 @@ function choroColor(per10k, pop) {
 
 function loadDensityLayer() {
   if (densityLayer) return Promise.resolve(densityLayer);
-  return fetch('data/processed/nyc_zip_density.geojson?v=20260507c')
+  return fetch('data/processed/nyc_zip_density.geojson?v=20260507d')
     .then(r => r.json())
     .then(geo => {
       densityLayer = L.geoJSON(geo, {

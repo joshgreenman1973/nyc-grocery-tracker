@@ -31,6 +31,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from chains import classify_chain
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PROCESSED = REPO_ROOT / "data" / "processed"
 STATE_PATH = PROCESSED / "nyc_food_stores.geojson"
@@ -155,6 +158,30 @@ def main() -> int:
                     )
                 )
                 if hard_disqualify:
+                    # Safeguards against over-correction:
+                    # 1. Don't demote stores whose name is explicitly a
+                    #    supermarket (contains SUPERMARKET / SUPERMRKT /
+                    #    MARKET / FOODS).
+                    name_upper = (f["properties"].get("name") or "").upper()
+                    is_explicit_super = bool(re.search(
+                        r"\bSUPERMARKET|SUPERMRKT|SUPERMKT|SUPER\s*MARKET",
+                        name_upper,
+                    ))
+                    # 2. Don't apply restaurant/cafe/fast-food/ice-cream
+                    #    overrides to large stores -- a 12k-sqft store with
+                    #    a hot-food bar is a supermarket, not a restaurant.
+                    soft_categories = (
+                        "amenity=restaurant", "amenity=fast_food",
+                        "amenity=cafe", "amenity=ice_cream",
+                        "shop=bakery", "shop=pastry", "shop=coffee",
+                        "shop=tea", "shop=deli", "shop=butcher",
+                    )
+                    sqft_val = f["properties"].get("sqft") or 0
+                    too_big_for_soft = best_cat in soft_categories and sqft_val >= 12000
+                    if is_explicit_super or too_big_for_soft:
+                        # Skip override; record it as a soft note instead
+                        f["properties"]["osm_override"] = ""
+                        continue
                     f["properties"]["is_supermarket"] = False
                     f["properties"]["size_class"] = "Other licensed food retailer"
                     f["properties"]["osm_override"] = best_cat
@@ -222,6 +249,9 @@ def main() -> int:
         else:
             # OSM-only feature; promote to a synthesized store entry
             p = of["properties"]
+            chain_name, chain_type = classify_chain(
+                " ".join([(p.get("name") or "").upper(), (p.get("brand") or "").upper()])
+            )
             new_features.append({
                 "type": "Feature",
                 "geometry": of["geometry"],
@@ -240,10 +270,50 @@ def main() -> int:
                     "source": "osm",
                     "osm_id": p.get("osm_id", ""),
                     "osm_shop": "supermarket",
+                    "osm_override": "",
                     "website": p.get("website", ""),
+                    "chain_name": chain_name or "",
+                    "chain_type": chain_type or "independent",
                 },
             })
             new_count += 1
+
+    # ---- Step 2b: chain classification + force-include rescue ----
+    # If a name matches a known supermarket chain, trust the chain over any
+    # name-keyword false positive (e.g., a Whole Foods entrance tagged as
+    # cafe in OSM). This both subcategorizes stores and rescues miscategorized
+    # ones.
+    chain_rescued = 0
+    chain_counts = {"national": 0, "local_nyc": 0, "independent": 0}
+    for f in state_features:
+        p = f["properties"]
+        # Combine name + entity for matching
+        combined_name = " ".join([
+            (p.get("name") or "").upper(),
+            (p.get("entity") or "").upper(),
+        ])
+        chain_name, chain_type = classify_chain(combined_name)
+        p["chain_name"] = chain_name or ""
+        p["chain_type"] = chain_type or "independent"
+        chain_counts[p["chain_type"]] += 1
+        if chain_name and not p.get("is_supermarket"):
+            # Rescue: chain match overrides earlier denylist/OSM verdict
+            p["is_supermarket"] = True
+            p["osm_override"] = ""  # clear the override note
+            sqft = p.get("sqft")
+            if sqft and sqft >= 10000:
+                p["size_class"] = "Large supermarket"
+            elif sqft and sqft >= 5000:
+                p["size_class"] = "Standard supermarket"
+            elif sqft and sqft >= 2500:
+                p["size_class"] = "Small supermarket or grocer"
+            elif sqft:
+                p["size_class"] = "Corner store or specialty"
+            else:
+                p["size_class"] = "Size unknown"
+            chain_rescued += 1
+    print(f"  chain matches: {chain_counts}", file=sys.stderr)
+    print(f"  chain force-include rescues: {chain_rescued}", file=sys.stderr)
 
     # ---- Step 3: dedup OSM-only entries that are within 30m of each other
     # (same store represented by both a node and a way in OSM, etc.) ----

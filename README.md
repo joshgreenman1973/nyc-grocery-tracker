@@ -2,7 +2,7 @@
 
 Every licensed retail food store in New York City's five boroughs, sized by reported square footage. A baseline for tracking whether Mayor Mamdani's planned public supermarket sites land in neighborhoods that actually lack full-service supermarkets today.
 
-**Live map:** https://vitalcity-nyc.github.io/nyc-grocery-tracker/
+**Live map:** https://joshgreenman1973.github.io/nyc-grocery-tracker/
 
 ## What's here
 
