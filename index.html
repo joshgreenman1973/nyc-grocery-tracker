@@ -415,7 +415,7 @@ const layers = {};
 const counts = {};
 let allFeatures = [];
 
-fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507e')
+fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507f')
   .then(r => r.json())
   .then(geo => {
     allFeatures = geo.features;
@@ -454,14 +454,13 @@ fetch('data/processed/nyc_food_stores_merged.geojson?v=20260507e')
       for (const f of feats) {
         const [lon, lat] = f.geometry.coordinates;
         const p = f.properties;
-        // Chain accent: ring color reflects chain type for full supermarkets
+        // Chain accent: ring color reflects chain type, regardless of size,
+        // so small chain stores are visually distinguishable from independents.
         const isFull = p.is_supermarket && ((p.sqft && p.sqft >= 5000) || p.source === 'osm');
         let strokeColor = '#222';
         let strokeWeight = 0.4;
-        if (isFull) {
-          if (p.chain_type === 'national') { strokeColor = '#c23616'; strokeWeight = 1.6; }
-          else if (p.chain_type === 'local_nyc') { strokeColor = '#2d8659'; strokeWeight = 1.6; }
-        }
+        if (p.chain_type === 'national') { strokeColor = '#c23616'; strokeWeight = 1.6; }
+        else if (p.chain_type === 'local_nyc') { strokeColor = '#2d8659'; strokeWeight = 1.6; }
         const marker = L.circleMarker([lat, lon], {
           radius: SIZE_RADII[cls],
           fillColor: SIZE_COLORS[cls],
@@ -572,7 +571,7 @@ function choroColor(per10k, pop) {
 
 function loadDensityLayer() {
   if (densityLayer) return Promise.resolve(densityLayer);
-  return fetch('data/processed/nyc_zip_density.geojson?v=20260507e')
+  return fetch('data/processed/nyc_zip_density.geojson?v=20260507f')
     .then(r => r.json())
     .then(geo => {
       densityLayer = L.geoJSON(geo, {
