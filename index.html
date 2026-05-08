@@ -231,7 +231,7 @@
 <header>
   <div class="kicker">PUBLIC SUPERMARKET ACCOUNTABILITY</div>
   <h1>Where are New York City's supermarkets?</h1>
-  <p>Licensed retail food stores in the five boroughs, sized by reported square footage. Mayor Mamdani has said the city will open one public supermarket in each borough; the first is planned for La Marqueta in East Harlem. This map is a baseline for asking which neighborhoods have a real supermarket today and which do not. The underlying state license file does not distinguish supermarkets from pharmacies, dollar stores, breweries, or bakeries; this map applies a name-based filter, but it is imperfect. Data current as of September 2025; new openings (e.g., Lidl at 120 5th Ave, Brooklyn) are missing. <a href="methodology.html" class="footer-link" style="margin-top:0;">Methodology &amp; sources &rarr;</a></p>
+  <p>Licensed retail food stores in the five boroughs, sized by reported square footage and tagged by chain. Mayor Mamdani has said the city will open one public supermarket in each borough; the first is planned for La Marqueta in East Harlem. This map is a baseline for asking which neighborhoods have a real supermarket today and which do not. The underlying state license file does not distinguish supermarkets from pharmacies, dollar stores, or bakeries; this map applies name and OSM-tag filters, drops obvious non-food retailers (breweries, bars, liquor stores, gas stations) entirely, and flags chain affiliation. Data current as of September 2025; new openings (e.g., Lidl at 120 5th Ave, Brooklyn) may be picked up by the OSM cross-reference. <a href="methodology.html" class="footer-link" style="margin-top:0;">Methodology &amp; sources &rarr;</a></p>
 </header>
 
 <div class="layout">
@@ -307,7 +307,7 @@
       <label class="toggle">
         <input type="checkbox" data-class="Other licensed food retailer">
         <span class="swatch" style="background: #d4a26a"></span>
-        <span class="label-text">Pharmacy, dollar store, brewery, etc.</span>
+        <span class="label-text">Pharmacy, dollar store, restaurant, etc.</span>
         <span class="count" data-count="Other licensed food retailer"></span>
       </label>
       <p class="legend-note">"Likely supermarket" excludes names matching pharmacy / dollar / brewery / restaurant / bakery patterns. OSM-only entries are stores tagged shop=supermarket on OpenStreetMap that aren't in the state license file (e.g., Lidl Park Slope at 120 Fifth Ave) — typically new openings.</p>
